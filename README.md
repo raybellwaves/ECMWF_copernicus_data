@@ -3,3 +3,4 @@ Scripts to download and manipulate data obtained from ECMWF for a specific proje
 
 1. download raw grib files: get_data_grib.ksh
 2. Convert the grib files to NetCDF: convert_grib.ksh
+2.a. Check the NetCDF files are the same size: 
