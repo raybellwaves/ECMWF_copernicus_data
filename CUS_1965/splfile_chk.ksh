@@ -1,4 +1,6 @@
-lit the netcdf files
+#!/bin/ksh
+#
+# Check the split the netcdf files
 
 filesl=448832860 # Need to know minimum size
 
