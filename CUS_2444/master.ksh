@@ -21,6 +21,7 @@ ddir=ftp://ftp.ecmwf.int/pub/copsup/CUS-${cusnum}/
 
 if [[ ${model} == egrr ]];then
     longmodel=GloSea5
+    nens=12 # This can vary based on itialtial conditions
 fi
 if [[ ${model} == lfpw ]];then
     longmodel=System5
@@ -33,7 +34,10 @@ fi
 getrawdata=0
 extractinitialconditions=0
 convertgrib=0
-splitensncfile=1
+splitensncfile=0
+convertto360181=0
+converttodegc=1
+seasonalavg=0
 
 if [[ ${getrawdata} -eq 1 ]];then
     mkdir -p raw_files
@@ -124,9 +128,6 @@ if [[ ${splitensncfile} -eq 1 ]];then
     cd ncfiles
 
     # Do an ncdump on a netcdf file to see how many ensembles it has
-    if [[ ${model} == egrr ]];then
-        nens=12
-    fi
 
     for i in {1..${nens}};do
         mkdir -p ens${i}
@@ -149,7 +150,6 @@ if [[ ${splitensncfile} -eq 1 ]];then
                 echo "ncks -O -x -v number ens${ens}/${longmodel}.${year}${month}.sst.nc ens${ens}/${longmodel}.${year}${month}.sst.nc" >> batch_files/file_${fileref}.ksh
                 # Make latitude -90-90 as currently is 90--90
                 echo "ncpdq -O -a -latitude ens${ens}/${longmodel}.${year}${month}.sst.nc ens${ens}/${longmodel}.${year}${month}.sst.nc" >> batch_files/file_${fileref}.ksh
-                # cdo?
 
                 # Submit script
                 rm -rf batch_files/file_${fileref}_submit.sh
@@ -173,6 +173,127 @@ if [[ ${splitensncfile} -eq 1 ]];then
         done
     done
 fi
-    
 
+if [[ ${convertto360181} -eq 1 ]];then
+    mkdir -p sst_monthly_360x181
+    cd sst_monthly_360x181
+    mkdir -p batch_files
+    mkdir -p logs
+
+    for i in {1..${nens}};do
+        mkdir -p ens${i}
+    done
+
+if [ ! -f batch_files/mygrid_1deg ];then
+cat > batch_files/mygrid_1deg << EOF
+gridtype = lonlat
+xsize    = 360
+ysize    = 181
+xfirst   = 0.0
+xinc     = 1
+yfirst   = -90.0
+yinc     = 1
+EOF
+fi
+
+    # counter
+    fileref=0
+    for year in {1994..2010}; do
+        for month in 10 11 12; do
+            for ens in {1..${nens}};do
+                rm -rf batch_files/file_${fileref}.ksh
+                echo "#!/bin/ksh" > batch_files/file_${fileref}.ksh
+                chmod u+x batch_files/file_${fileref}.ksh
+                echo "cdo remapbil,batch_files/mygrid_1deg ${wdir}/ncfiles/ens${ens}/${longmodel}.${year}${month}.sst.nc ens${ens}/${longmodel}.${year}${month}.sst.nc" >> batch_files/file_${fileref}.ksh
+
+                # Submit script
+                rm -rf batch_files/file_${fileref}_submit.sh
+                echo "#BSUB -o logs/file_${fileref}.out" > batch_files/file_${fileref}_submit.sh 
+                echo "#BSUB -e logs/file_${fileref}.err" >> batch_files/file_${fileref}_submit.sh 
+                echo "#BSUB -W 0:01" >> batch_files/file_${fileref}_submit.sh 
+                echo "#BSUB -q general" >> batch_files/file_${fileref}_submit.sh
+                echo "#BSUB -n 1" >> batch_files/file_${fileref}_submit.sh   
+                echo "#" >> batch_files/file_${fileref}_submit.sh
+                echo "batch_files/file_${fileref}.ksh" >> batch_files/file_${fileref}_submit.sh
+
+                # Check that the file hasn't been created
+                if [[ ! -f ens${ens}/${longmodel}.${year}${month}.sst.nc ]]; then
+                    echo "creating file ens${ens}/${longmodel}.${year}${month}.sst.nc"
+                    bsub < batch_files/file_${fileref}_submit.sh
+                    let fileref=$fileref+1
+                else
+                    echo "file ens${ens}/${longmodel}.${year}${month}.sst.nc exists"
+                fi
+            done
+        done
+    done
+fi
+
+if [[ ${converttodegc} -eq 1 ]];then
+
+    cd sst_monthly_360x181
+
+    # counter
+    fileref=0
+    for year in {1994..2010}; do
+        for month in 10 11 12; do
+            for ens in {1..${nens}};do
+                rm -rf batch_files/file_${fileref}.ksh
+                echo "#!/bin/ksh" > batch_files/file_${fileref}.ksh
+                chmod u+x batch_files/file_${fileref}.ksh
+                echo "ncap2 -O -s sst=sst-273.15 ens${ens}/${longmodel}.${year}${month}.sst.nc ens${ens}/${longmodel}.${year}${month}.sst.nc" >> batch_files/file_${fileref}.ksh 
+                echo 'ncatted -O -a units,sst,o,c,"degress C" ens'${ens}'/'${longmodel}'.'${year}${month}'.sst.nc' 'ens'${ens}'/'${longmodel}'.'${year}${month}'.sst.nc' >> batch_files/file_${fileref}.ksh 
+
+                # Submit script
+                rm -rf batch_files/file_${fileref}_submit.sh
+                echo "#BSUB -o logs/file_${fileref}.out" > batch_files/file_${fileref}_submit.sh 
+                echo "#BSUB -e logs/file_${fileref}.err" >> batch_files/file_${fileref}_submit.sh 
+                echo "#BSUB -W 0:01" >> batch_files/file_${fileref}_submit.sh 
+                echo "#BSUB -q general" >> batch_files/file_${fileref}_submit.sh
+                echo "#BSUB -n 1" >> batch_files/file_${fileref}_submit.sh   
+                echo "#" >> batch_files/file_${fileref}_submit.sh
+                echo "batch_files/file_${fileref}.ksh" >> batch_files/file_${fileref}_submit.sh
+          
+                # Check if the units are already degrees C
+                ncdump -h ens${ens}/${longmodel}.${year}${month}.sst.nc > header.txt
+                linechk=`egrep "sst:units = " header.txt | head -1`
+                # Grab between '= ' and ' ;'
+                chkval=`echo ${linechk} | grep -oP '(?<== ).*?(?= ;)'`
+                if [[ ${chkval} == '"K"'  ]]; then
+                    echo "changing units of ens${ens}/${longmodel}.${year}${month}.sst.nc"
+                    bsub < batch_files/file_${fileref}_submit.sh
+                    let fileref=$fileref+1
+                else
+                    echo "units of ens${ens}/${longmodel}.${year}${month}.sst.nc already changed"
+                fi
+            done
+        done
+    done
+fi
+
+
+if [[ ${seasonalavg} -eq 1 ]];then
+    mkdir -p sst_seasonal_360x181
+    cd sst_seasonal_360x181
+    mkdir -p batch_files
+    mkdir -p logs
+
+
+    for i in {1..${nens}};do
+        mkdir -p ens${i}
+    done
+
+    # counter
+    fileref=0
+    for year in {1994..2010}; do
+        for month in 10 11 12; do
+            for ens in {1..${nens}};do
+                rm -rf batch_files/file_${fileref}.ksh
+                echo "#!/bin/ksh" > batch_files/file_${fileref}.ksh
+                chmod u+x batch_files/file_${fileref}.ksh
+
+            done
+        done
+    done
+fi
 
