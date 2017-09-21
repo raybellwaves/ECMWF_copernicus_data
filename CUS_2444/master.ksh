@@ -1,11 +1,11 @@
 #!/bin/ksh
-# /projects/rsmas/kirtman/rxb826/DATA/MetOffice_GloSea5/sst_monthly/master.ksh
+# /projects/rsmas/kirtman/rxb826/DATA/MetOffice_GloSea5/mslp_monthly/master.ksh
 #
 # Get Copernisus data
 # Copy this script along with master_submit.sh to each model directory and
 # comment out the model of interest
-# cp master.ksh master_submit.sh /projects/rsmas/kirtman/rxb826/DATA/ECMWF_System4/sst_monthly/
-# cp master.ksh master_submit.sh /projects/rsmas/kirtman/rxb826/DATA/MeteoFrance_System5/sst_monthly/
+# cp master.ksh master_submit.sh /projects/rsmas/kirtman/rxb826/DATA/ECMWF_System4/mslp_monthly/
+# cp master.ksh master_submit.sh /projects/rsmas/kirtman/rxb826/DATA/MeteoFrance_System5/mslp_monthly/
 #
 # 6/27/17
 
@@ -14,14 +14,26 @@ model=egrr # MetOffice_GloSea5
 #model=ecmf # ECMWF_System4
 #model=lfpw # MeteoFrance_System5
 
+var=msl
+newvarname=mslp
+
+# Region 
+lonw=260.0
+lone=30.0
+lats=0.0
+latn=80.0
+regionname=NAtl
+# Seasonalaverage
+savgname=DJFmean
+
 wdir=`pwd`
 
-cusnum=2444
+cusnum=2737
 ddir=ftp://ftp.ecmwf.int/pub/copsup/CUS-${cusnum}/
 
 if [[ ${model} == egrr ]];then
     longmodel=GloSea5
-    nens=12 # This can vary based on itialtial conditions
+    nens=12 # This can vary based on initial conditions
 fi
 if [[ ${model} == lfpw ]];then
     longmodel=System5
@@ -36,18 +48,18 @@ extractinitialconditions=0
 convertgrib=0
 splitensncfile=0
 convertto360181=0
-converttodegc=1
-seasonalavg=0
+converttohPa=0
+seasonalavg=1
 
 if [[ ${getrawdata} -eq 1 ]];then
     mkdir -p raw_files
     cd raw_files
 
     # Download the data
-    wget ${ddir}/sst_${model}.grib
+    wget ${ddir}${var}_${model}.grib
 
     # Grab the mars download script for reference
-    wget ${ddir}CUS-2444-MARS-request-sst-${model}.mars
+    wget ${ddir}CUS-${cusnum}-MARS-request-${var}-${model}.mars
 fi
 
 if [[ ${extractinitialconditions} -eq 1 ]];then
@@ -63,7 +75,7 @@ if [[ ${extractinitialconditions} -eq 1 ]];then
             rm -rf batch_files/file_${fileref}.ksh
             echo "#!/bin/ksh" > batch_files/file_${fileref}.ksh
             chmod u+x batch_files/file_${fileref}.ksh
-            echo "grib_copy -w dataDate=${year}${month}01 ${wdir}/raw_files/sst_${model}.grib ${longmodel}.${year}${month}.sst.grb" >> batch_files/file_${fileref}.ksh
+            echo "grib_copy -w dataDate=${year}${month}01 ${wdir}/raw_files/${var}_${model}.grib ${longmodel}.${year}${month}.${var}.grb" >> batch_files/file_${fileref}.ksh
 
             # Submit script
             rm -rf batch_files/file_${fileref}_submit.sh
@@ -77,11 +89,11 @@ if [[ ${extractinitialconditions} -eq 1 ]];then
 
             # Check that the file hasn't been created
             if [[ ! -f ${longmodel}.${year}${month}.sst.grb ]]; then
-                echo "creating file ${longmodel}.${year}${month}.sst.grb"
+                echo "creating file ${longmodel}.${year}${month}.${var}.grb"
                 bsub < batch_files/file_${fileref}_submit.sh
                 let fileref=$fileref+1
             else
-                echo "file ${longmodel}.${year}${month}.sst.grb exists"
+                echo "file ${longmodel}.${year}${month}.${var}.grb exists"
             fi
         done
     done
@@ -99,7 +111,7 @@ if [[ ${convertgrib} -eq 1 ]];then
             rm -rf batch_files/file_${fileref}.ksh
             echo "#!/bin/ksh" > batch_files/file_${fileref}.ksh
             chmod u+x batch_files/file_${fileref}.ksh
-            echo "grib_to_netcdf -R 18500101 -o ${longmodel}.${year}${month}.sst.nc ${wdir}/files/${longmodel}.${year}${month}.sst.grb" >> batch_files/file_${fileref}.ksh
+            echo "grib_to_netcdf -R 18500101 -o ${longmodel}.${year}${month}.${var}.nc ${wdir}/files/${longmodel}.${year}${month}.${var}.grb" >> batch_files/file_${fileref}.ksh
 
             # Submit script
             rm -rf batch_files/file_${fileref}_submit.sh
@@ -112,12 +124,12 @@ if [[ ${convertgrib} -eq 1 ]];then
             echo "batch_files/file_${fileref}.ksh" >> batch_files/file_${fileref}_submit.sh
 
             # Check that the file hasn't been created
-            if [[ ! -f ${longmodel}.${year}${month}.sst.nc ]]; then
-                echo "creating file ${longmodel}.${year}${month}.sst.nc"
+            if [[ ! -f ${longmodel}.${year}${month}.${var}.nc ]]; then
+                echo "creating file ${longmodel}.${year}${month}.${var}.nc"
                 bsub < batch_files/file_${fileref}_submit.sh
                 let fileref=$fileref+1
             else
-                echo "file ${longmodel}.${year}${month}.sst.nc exists"
+                echo "file ${longmodel}.${year}${month}.${var}.nc exists"
             fi
         done
     done
@@ -144,12 +156,12 @@ if [[ ${splitensncfile} -eq 1 ]];then
                 echo "#!/bin/ksh" > batch_files/file_${fileref}.ksh
                 chmod u+x batch_files/file_${fileref}.ksh
                 # Extract ensemble
-                echo "ncks -O -d number,${ensembleextract} ${longmodel}.${year}${month}.sst.nc ens${ens}/${longmodel}.${year}${month}.sst.nc" >> batch_files/file_${fileref}.ksh
+                echo "ncks -O -d number,${ensembleextract} ${longmodel}.${year}${month}.${var}.nc ens${ens}/${longmodel}.${year}${month}.${var}.nc" >> batch_files/file_${fileref}.ksh
                 # Remove ensemble dimension
-                echo "ncwa -O -a number ens${ens}/${longmodel}.${year}${month}.sst.nc ens${ens}/${longmodel}.${year}${month}.sst.nc" >> batch_files/file_${fileref}.ksh
-                echo "ncks -O -x -v number ens${ens}/${longmodel}.${year}${month}.sst.nc ens${ens}/${longmodel}.${year}${month}.sst.nc" >> batch_files/file_${fileref}.ksh
+                echo "ncwa -O -a number ens${ens}/${longmodel}.${year}${month}.${var}.nc ens${ens}/${longmodel}.${year}${month}.${var}.nc" >> batch_files/file_${fileref}.ksh
+                echo "ncks -O -x -v number ens${ens}/${longmodel}.${year}${month}.${var}.nc ens${ens}/${longmodel}.${year}${month}.${var}.nc" >> batch_files/file_${fileref}.ksh
                 # Make latitude -90-90 as currently is 90--90
-                echo "ncpdq -O -a -latitude ens${ens}/${longmodel}.${year}${month}.sst.nc ens${ens}/${longmodel}.${year}${month}.sst.nc" >> batch_files/file_${fileref}.ksh
+                echo "ncpdq -O -a -latitude ens${ens}/${longmodel}.${year}${month}.${var}.nc ens${ens}/${longmodel}.${year}${month}.${var}.nc" >> batch_files/file_${fileref}.ksh
 
                 # Submit script
                 rm -rf batch_files/file_${fileref}_submit.sh
@@ -162,12 +174,12 @@ if [[ ${splitensncfile} -eq 1 ]];then
                 echo "batch_files/file_${fileref}.ksh" >> batch_files/file_${fileref}_submit.sh
 
                 # Check that the file hasn't been created
-                if [[ ! -f ens${ens}/${longmodel}.${year}${month}.sst.nc ]]; then
-                    echo "creating file ens${ens}/${longmodel}.${year}${month}.sst.nc"
+                if [[ ! -f ens${ens}/${longmodel}.${year}${month}.${var}.nc ]]; then
+                    echo "creating file ens${ens}/${longmodel}.${year}${month}.${var}.nc"
                     bsub < batch_files/file_${fileref}_submit.sh
                     let fileref=$fileref+1
                 else
-                    echo "file ens${ens}/${longmodel}.${year}${month}.sst.nc exists"
+                    echo "file ens${ens}/${longmodel}.${year}${month}.${var}.nc exists"
                 fi
             done
         done
@@ -175,10 +187,12 @@ if [[ ${splitensncfile} -eq 1 ]];then
 fi
 
 if [[ ${convertto360181} -eq 1 ]];then
-    mkdir -p sst_monthly_360x181
-    cd sst_monthly_360x181
+    mkdir -p ${var}_monthly_360x181
+    cd ${var}_monthly_360x181
     mkdir -p batch_files
     mkdir -p logs
+    rm -rf batch_files/*
+    rm -rf logs/*
 
     for i in {1..${nens}};do
         mkdir -p ens${i}
@@ -204,7 +218,9 @@ fi
                 rm -rf batch_files/file_${fileref}.ksh
                 echo "#!/bin/ksh" > batch_files/file_${fileref}.ksh
                 chmod u+x batch_files/file_${fileref}.ksh
-                echo "cdo remapbil,batch_files/mygrid_1deg ${wdir}/ncfiles/ens${ens}/${longmodel}.${year}${month}.sst.nc ens${ens}/${longmodel}.${year}${month}.sst.nc" >> batch_files/file_${fileref}.ksh
+                echo "cdo remapbil,batch_files/mygrid_1deg ${wdir}/ncfiles/ens${ens}/${longmodel}.${year}${month}.${var}.nc ens${ens}/${longmodel}.${year}${month}.${var}.nc" >> batch_files/file_${fileref}.ksh
+                echo "cdo setreftime,1850-01-01,00:00:00,days ens${ens}/${longmodel}.${year}${month}.${var}.nc ens${ens}/${longmodel}.${year}${month}.${var}_tmp.nc" >> batch_files/file_${fileref}.ksh
+                echo "mv ens${ens}/${longmodel}.${year}${month}.${var}_tmp.nc ens${ens}/${longmodel}.${year}${month}.${var}.nc" >> batch_files/file_${fileref}.ksh
 
                 # Submit script
                 rm -rf batch_files/file_${fileref}_submit.sh
@@ -217,21 +233,23 @@ fi
                 echo "batch_files/file_${fileref}.ksh" >> batch_files/file_${fileref}_submit.sh
 
                 # Check that the file hasn't been created
-                if [[ ! -f ens${ens}/${longmodel}.${year}${month}.sst.nc ]]; then
-                    echo "creating file ens${ens}/${longmodel}.${year}${month}.sst.nc"
+                if [[ ! -f ens${ens}/${longmodel}.${year}${month}.${var}.nc ]]; then
+                    echo "creating file ens${ens}/${longmodel}.${year}${month}.${var}.nc"
                     bsub < batch_files/file_${fileref}_submit.sh
                     let fileref=$fileref+1
                 else
-                    echo "file ens${ens}/${longmodel}.${year}${month}.sst.nc exists"
+                    echo "file ens${ens}/${longmodel}.${year}${month}.${var}.nc exists"
                 fi
             done
         done
     done
 fi
 
-if [[ ${converttodegc} -eq 1 ]];then
+if [[ ${converttohPa} -eq 1 ]];then
 
-    cd sst_monthly_360x181
+    cd ${var}_monthly_360x181
+    rm -rf batch_files/*
+    rm -rf logs/*
 
     # counter
     fileref=0
@@ -241,8 +259,10 @@ if [[ ${converttodegc} -eq 1 ]];then
                 rm -rf batch_files/file_${fileref}.ksh
                 echo "#!/bin/ksh" > batch_files/file_${fileref}.ksh
                 chmod u+x batch_files/file_${fileref}.ksh
-                echo "ncap2 -O -s sst=sst-273.15 ens${ens}/${longmodel}.${year}${month}.sst.nc ens${ens}/${longmodel}.${year}${month}.sst.nc" >> batch_files/file_${fileref}.ksh 
-                echo 'ncatted -O -a units,sst,o,c,"degress C" ens'${ens}'/'${longmodel}'.'${year}${month}'.sst.nc' 'ens'${ens}'/'${longmodel}'.'${year}${month}'.sst.nc' >> batch_files/file_${fileref}.ksh 
+                echo "ncap2 -O -s 'msl=msl/100' ens${ens}/${longmodel}.${year}${month}.${var}.nc ens${ens}/${longmodel}.${year}${month}.${var}.nc" >> batch_files/file_${fileref}.ksh 
+                echo 'ncatted -O -a units,msl,o,c,"hPa" ens'${ens}'/'${longmodel}'.'${year}${month}'.'${var}'.nc' 'ens'${ens}'/'${longmodel}'.'${year}${month}'.'${var}'.nc' >> batch_files/file_${fileref}.ksh
+                echo "ncrename -O -v ${var},${newvarname} ens${ens}/${longmodel}.${year}${month}.${var}.nc ens${ens}/${longmodel}.${year}${month}.${newvarname}.nc" >> batch_files/file_${fileref}.ksh
+                echo "rm -rf ens${ens}/${longmodel}.${year}${month}.${var}.nc" >> batch_files/file_${fileref}.ksh
 
                 # Submit script
                 rm -rf batch_files/file_${fileref}_submit.sh
@@ -253,18 +273,14 @@ if [[ ${converttodegc} -eq 1 ]];then
                 echo "#BSUB -n 1" >> batch_files/file_${fileref}_submit.sh   
                 echo "#" >> batch_files/file_${fileref}_submit.sh
                 echo "batch_files/file_${fileref}.ksh" >> batch_files/file_${fileref}_submit.sh
-          
-                # Check if the units are already degrees C
-                ncdump -h ens${ens}/${longmodel}.${year}${month}.sst.nc > header.txt
-                linechk=`egrep "sst:units = " header.txt | head -1`
-                # Grab between '= ' and ' ;'
-                chkval=`echo ${linechk} | grep -oP '(?<== ).*?(?= ;)'`
-                if [[ ${chkval} == '"K"'  ]]; then
-                    echo "changing units of ens${ens}/${longmodel}.${year}${month}.sst.nc"
+
+                # Check that the file hasn't been created
+                if [[ ! -f ens${ens}/${longmodel}.${year}${month}.${newvarname}.nc ]]; then
+                    echo "creating file ens${ens}/${longmodel}.${year}${month}.${newvarname}.nc"
                     bsub < batch_files/file_${fileref}_submit.sh
                     let fileref=$fileref+1
                 else
-                    echo "units of ens${ens}/${longmodel}.${year}${month}.sst.nc already changed"
+                    echo "file ens${ens}/${longmodel}.${year}${month}.${newvarname}.nc exists"
                 fi
             done
         done
@@ -273,11 +289,12 @@ fi
 
 
 if [[ ${seasonalavg} -eq 1 ]];then
-    mkdir -p sst_seasonal_360x181
-    cd sst_seasonal_360x181
+    mkdir -p Regional_1deg_seasonal
+    cd Regional_1deg_seasonal
     mkdir -p batch_files
     mkdir -p logs
-
+    rm -rf batch_files/*
+    rm -rf logs/*
 
     for i in {1..${nens}};do
         mkdir -p ens${i}
@@ -286,12 +303,49 @@ if [[ ${seasonalavg} -eq 1 ]];then
     # counter
     fileref=0
     for year in {1994..2010}; do
+        year2=`expr $year + 1`
         for month in 10 11 12; do
             for ens in {1..${nens}};do
-                rm -rf batch_files/file_${fileref}.ksh
                 echo "#!/bin/ksh" > batch_files/file_${fileref}.ksh
                 chmod u+x batch_files/file_${fileref}.ksh
 
+                if [[ ${savgname} == DJFmean ]];then
+                    if [[ ${month} == 10 ]];then
+                        point0=2
+                        point1=4
+                    fi
+                    if [[ ${month} == 11 ]];then
+                        point0=1
+                        point1=3
+                    fi
+                    if [[ ${month} == 12 ]];then
+                        point0=0
+                        point1=2
+                    fi
+                
+                    # Extract region
+                    echo "ncks -O -d lon,${lonw},${lone} -d lat,${lats},${latn} -d time,${point0},${point1} ${wdir}/${var}_monthly_360x181/ens${ens}/${longmodel}.${year}${month}.${newvarname}.nc ens${ens}/${newvarname}_${year}-${year2}_DJF_${regionname}.nc" >> batch_files/file_${fileref}.ksh
+                    # Average
+                    echo "ncra -O ens${ens}/${newvarname}_${year}-${year2}_DJF_${regionname}.nc ens${ens}/${newvarname}_${year}-${year2}_${savgname}_${regionname}.nc" >> batch_files/file_${fileref}.ksh
+                fi
+
+                # Submit script
+                echo "#BSUB -o logs/file_${fileref}.out" > batch_files/file_${fileref}_submit.sh 
+                echo "#BSUB -e logs/file_${fileref}.err" >> batch_files/file_${fileref}_submit.sh 
+                echo "#BSUB -W 0:02" >> batch_files/file_${fileref}_submit.sh 
+                echo "#BSUB -q general" >> batch_files/file_${fileref}_submit.sh
+                echo "#BSUB -n 1" >> batch_files/file_${fileref}_submit.sh   
+                echo "#" >> batch_files/file_${fileref}_submit.sh
+                echo "batch_files/file_${fileref}.ksh" >> batch_files/file_${fileref}_submit.sh
+
+                # Check that the file hasn't been created
+                if [[ ! -f ens${ens}/${newvarname}_${year}-${year2}_${savgname}_${regionname}.nc ]]; then
+                    echo "creating file ens${ens}/${newvarname}_${year}-${year2}_${savgname}_${regionname}.nc"
+                    bsub < batch_files/file_${fileref}_submit.sh
+                    let fileref=$fileref+1
+                else
+                    echo "file ens${ens}/${newvarname}_${year}-${year2}_${savgname}_${regionname}.nc exists"
+                fi
             done
         done
     done
