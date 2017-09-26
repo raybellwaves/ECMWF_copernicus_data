@@ -329,6 +329,8 @@ if [[ ${seasonalavg} -eq 1 ]];then
                     echo "ncks -O -d lon,${lonw},${lone} -d lat,${lats},${latn} -d time,${point0},${point1} ${wdir}/${var}_monthly_360x181/ens${ens}/${longmodel}.${year}${month}.${newvarname}.nc ens${ens}/${longmodel}_ens${ens}_${month}ic_${year}-${year2}_DJF_${regionname}.nc" >> batch_files/file_${fileref}.ksh
                     # Average
                     echo "ncra -O ens${ens}/${longmodel}_ens${ens}_${month}ic_${year}-${year2}_DJF_${regionname}.nc ens${ens}/${longmodel}_ens${ens}_${month}ic_${year}-${year2}_${savgname}_${regionname}.nc" >> batch_files/file_${fileref}.ksh
+                    # Update lon and lat names
+                    echo "ncrename -O -d lon,longitude -d lat,latitude -v lon,longitude -v lat,latitude ens${ens}/${longmodel}_ens${ens}_${month}ic_${year}-${year2}_${savgname}_${regionname}.nc ens${ens}/${longmodel}_ens${ens}_${month}ic_${year}-${year2}_${savgname}_${regionname}.nc" >> batch_files/file_${fileref}.ksh
                 fi
 
                 # Submit script
