@@ -48,10 +48,10 @@ fi
 getrawdata=0
 extractinitialconditions=0
 convertgrib=0
-splitensncfile=0
+splitensncfile=1
 convertto360181=0
 converttohPa=0
-seasonalavg=1
+seasonalavg=0
 
 if [[ ${getrawdata} -eq 1 ]];then
     mkdir -p raw_files
@@ -152,7 +152,7 @@ if [[ ${splitensncfile} -eq 1 ]];then
     for year in {1994..2010}; do
         for month in 10 11 12; do
             for ens in {1..${nens}};do
-                ensembleextract=`expr ${i} - 1`
+                ensembleextract=`expr ${ens} - 1`
 
                 rm -rf batch_files/file_${fileref}.ksh
                 echo "#!/bin/ksh" > batch_files/file_${fileref}.ksh
@@ -354,4 +354,3 @@ if [[ ${seasonalavg} -eq 1 ]];then
         done
     done
 fi
-
