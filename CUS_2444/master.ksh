@@ -35,12 +35,12 @@ if [[ ${model} == egrr ]];then
     longmodel=GloSea5
     nens=12 # This can vary based on itialtial conditions
 fi
-if [[ ${model} == lfpw ]];then
-    longmodel=System5
+if [[ ${model} == ecmf ]];then
+    longmodel=System4
     nens=15
 fi
 if [[ ${model} == lfpw ]];then
-    longmodel=System4
+    longmodel=System5
     nens=15
 fi
 
