@@ -18,11 +18,11 @@ var=sst
 newvarname=sst
 
 # Region 
-lonw=260.0
-lone=30.0
-lats=0.0
-latn=80.0
-regionname=NAtl
+lonw=0.0
+lone=360.0
+lats=-90.0
+latn=90.0
+regionname=global
 # Seasonalaverage
 savgname=DJFmean
 
@@ -346,9 +346,12 @@ if [[ ${seasonalavg} -eq 1 ]];then
                     echo "ncra -O ens${ens}/${longmodel}_ens${ens}_${month}ic_${year}-${year2}_DJF.nc ens${ens}/${longmodel}_ens${ens}_${month}ic_${year}-${year2}_${savgname}.nc" >> batch_files/file_${fileref}.ksh
                     # Update lon and lat names
                     echo "ncrename -O -d lon,longitude -d lat,latitude -v lon,longitude -v lat,latitude ens${ens}/${longmodel}_ens${ens}_${month}ic_${year}-${year2}_${savgname}.nc ens${ens}/${longmodel}_ens${ens}_${month}ic_${year}-${year2}_${savgname}.nc" >> batch_files/file_${fileref}.ksh
+                    # Add ensemble in
+                    echo "ncap2 -s 'defdim("'"'ensemble'"'",1);ensemble[ensemble]="${ens}";ensemble@long_name="'"ensemble"'"'"" -O ens${ens}/${longmodel}_ens${ens}_${month}ic_${year}-${year2}_${savgname}.nc ens${ens}/${longmodel}_ens${ens}_${month}ic_${year}-${year2}_${savgname}_tmp.nc"  >> batch_files/file_${fileref}.ksh
+                    echo "mv ens${ens}/${longmodel}_ens${ens}_${month}ic_${year}-${year2}_${savgname}_tmp.nc ens${ens}/${longmodel}_ens${ens}_${month}ic_${year}-${year2}_${savgname}.nc"  >> batch_files/file_${fileref}.ksh
                 
                     # Extract region
-                    echo "ncks -O -d lon,${lonw},${lone} -d lat,${lats},${latn} ens${ens}/${longmodel}_ens${ens}_${month}ic_${year}-${year2}_${savgname}.nc ${wdir}/Regional_1deg_seasonal/ens${ens}/${longmodel}_ens${ens}_${month}ic_${year}-${year2}_${savgname}_${regionname}.nc" >> batch_files/file_${fileref}.ksh
+                    echo "ncks -O -d longitude,${lonw},${lone} -d latitude,${lats},${latn} ens${ens}/${longmodel}_ens${ens}_${month}ic_${year}-${year2}_${savgname}.nc ${wdir}/Regional_1deg_seasonal/ens${ens}/${longmodel}_ens${ens}_${month}ic_${year}-${year2}_${savgname}_${regionname}.nc" >> batch_files/file_${fileref}.ksh
                 fi
 
                 # Submit script
@@ -368,7 +371,6 @@ if [[ ${seasonalavg} -eq 1 ]];then
                 else
                     echo "file ${wdir}/Regional_1deg_seasonal/ens${ens}/${longmodel}_ens${ens}_${month}ic_${year}-${year2}_${savgname}_${regionname}.nc exists"
                 fi
-
             done
         done
     done
